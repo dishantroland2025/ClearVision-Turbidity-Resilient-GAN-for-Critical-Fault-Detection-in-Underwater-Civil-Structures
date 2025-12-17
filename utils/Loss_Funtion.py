@@ -26,7 +26,6 @@ def lab_color_loss(fake, real):
     fake_lab = K.rgb_to_lab((fake + 1) / 2)
     real_lab = K.rgb_to_lab((real + 1) / 2)
 
-    # Only a and b channels
     return (
         torch.mean(torch.abs(fake_lab[:, 1] - real_lab[:, 1])) +
         torch.mean(torch.abs(fake_lab[:, 2] - real_lab[:, 2]))
@@ -43,13 +42,9 @@ def edge_loss(fake, real):
 
 
 # -------------------------------------------------
-# Depth-Weighted Loss (ADDED)
+# Depth-Weighted Loss
 # -------------------------------------------------
 def depth_weighted_loss(fake, real, depth, max_depth=1.0):
-    """
-    Emphasizes distant / heavily degraded regions.
-    depth: (B, 1, H, W) or (B, H, W)
-    """
     if depth.dim() == 3:
         depth = depth.unsqueeze(1)
 
@@ -58,7 +53,7 @@ def depth_weighted_loss(fake, real, depth, max_depth=1.0):
 
 
 # -------------------------------------------------
-# Perceptual Loss (VGG-based)
+# Perceptual Loss (VGG-based, WITH normalization)
 # -------------------------------------------------
 class PerceptualLoss(nn.Module):
     def __init__(self, vgg):
@@ -66,7 +61,24 @@ class PerceptualLoss(nn.Module):
         self.vgg = vgg
         self.layers = [2, 7, 16, 25]  # relu1_2, relu2_2, relu3_4, relu4_4
 
+        for p in self.vgg.parameters():
+            p.requires_grad = False
+
+    def _normalize(self, x):
+        mean = torch.tensor(
+            [0.485, 0.456, 0.406], device=x.device
+        ).view(1, 3, 1, 1)
+        std = torch.tensor(
+            [0.229, 0.224, 0.225], device=x.device
+        ).view(1, 3, 1, 1)
+
+        x = (x + 1) / 2  # [-1, 1] → [0, 1]
+        return (x - mean) / std
+
     def forward(self, fake, real):
+        fake = self._normalize(fake)
+        real = self._normalize(real)
+
         loss = torch.tensor(0.0, device=fake.device)
         x_f, x_r = fake, real
 
@@ -118,4 +130,16 @@ def generator_loss(
         lambdas["depth"] * loss_depth
     )
 
-    return total
+    # -------------------------------------------------
+    # Loss dictionary (ADDED AS REQUESTED)
+    # -------------------------------------------------
+    loss_dict = {
+        "Total": total.item(),
+        "Adv": loss_adv.item(),
+        "Pixel": loss_pix.item(),
+        "Color": loss_color.item(),
+        "Edge": loss_edge.item(),
+        "Depth": loss_depth.item() if depth is not None else 0
+    }
+
+    return total, loss_dict
