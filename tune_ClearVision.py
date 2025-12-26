@@ -39,7 +39,7 @@ def objective(trial):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # PATHS (Verify these!)
-    TURBID_PATH = "/Users/dishantdas/Sorted-UIEBraw"
+    TURBID_PATH = "/Users/dishantdas/Sorted-UIEB/Raw"
     CLEAR_PATH = "/Users/dishantdas/Sorted-UIEB/GT"
     DEPTH_PATH = "/Users/dishantdas/Sorted-UIEB/depths"
     
